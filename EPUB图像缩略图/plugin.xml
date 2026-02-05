@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+<name>EPUB图像缩略图</name>
+<type>edit</type>
+<author>赤霓</author>
+<description>在一个新窗口中，网格显示EPUB内的图像缩略图。</description>
+<engine>python3.4</engine>
+<version>0.1</version>
+<oslist>osx,unx,win</oslist>
+<autostart>true</autostart>
+</plugin>
