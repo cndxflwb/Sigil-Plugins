@@ -2,10 +2,11 @@
 <plugin>
 <name>charCount</name>
 <type>validation</type>
-<author>郝梅实</author>
-<description>字数统计</description>
+<author>赤霓</author>
+<description>字符统计</description>
 <engine>python3.4</engine>
 <version>0.3</version>
 <oslist>osx,unx,win</oslist>
 <autostart>true</autostart>
+
 </plugin>
