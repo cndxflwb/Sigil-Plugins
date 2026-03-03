@@ -40,13 +40,14 @@ def run(bc):
     canvas.configure(yscrollcommand=v_scrollbar.set)
 
     # --- 资源获取与调试核心 ---
-    img_list = []
+    img_list = []  # 每个元素为 (id, href)
     print("--- 启动 Manifest 扫描 ---")
     try:
-        # 兼容 0.9.10 的迭代方式
+        # 兼容 0.9.10 的迭代方式，item 可能返回 (id, href) 或 (id, href, type)
         for item in bc.image_iter():
-            # item 可能返回 (id, href) 或 (id, href, type)
-            img_list.append(item[0])
+            img_id = item[0]
+            img_href = item[1]   # 第二个元素始终是文件路径
+            img_list.append((img_id, img_href))
     except Exception as e:
         print(u"无法获取图片列表: {0}".format(e))
 
@@ -56,12 +57,11 @@ def run(bc):
         tk.Label(scroll_frame, text="未发现图像资源").pack(pady=20)
     else:
         cols = 4
-        for i, img_id in enumerate(img_list):
+        for i, (img_id, img_href) in enumerate(img_list):
             try:
-                # 尝试读取二进制数据
-                # 如果报错 'Id does not exist'，会在此处触发异常
+                # 尝试读取二进制数据（仍使用ID读取）
                 data = bc.readfile(img_id)
-                
+
                 img = Image.open(BytesIO(data))
                 img.thumbnail((160, 160))
                 photo = ImageTk.PhotoImage(img)
@@ -69,27 +69,32 @@ def run(bc):
                 # 正常显示容器
                 f = tk.Frame(scroll_frame, bd=1, relief="sunken")
                 f.grid(row=i // cols, column=i % cols, padx=10, pady=10)
-                
+
                 lbl_img = tk.Label(f, image=photo)
-                lbl_img.image = photo 
+                lbl_img.image = photo
                 lbl_img.pack()
-                
-                # 文件名显示
-                short_name = img_id if len(img_id) < 18 else img_id[:15] + "..."
+
+                # 提取并显示文件名（不含路径）
+                filename = img_href.split('/')[-1]   # 假设使用 '/' 分隔
+                short_name = filename if len(filename) < 18 else filename[:15] + "..."
                 tk.Label(f, text=short_name, font=("Arial", 8)).pack()
 
             except Exception as e:
-                # --- 调试方案：捕获并定位错误 ID ---
-                error_info = u"ID: {0}".format(img_id, str(e))
+                # --- 调试方案：捕获并定位错误资源 ---
+                error_info = u"ID: {0}, Href: {1}".format(img_id, img_href)
                 print(u"【疑似重复图片资源项】 " + error_info)
-                
-                # 在 GUI 界面绘制红色警告块
+
+                # 在 GUI 界面绘制红色警告块（显示文件名）
                 f_err = tk.Frame(scroll_frame, bd=1, relief="solid", bg="#FFE4E1", width=160, height=180)
                 f_err.grid(row=i // cols, column=i % cols, padx=10, pady=10)
-                f_err.grid_propagate(False) # 固定大小
-                
+                f_err.grid_propagate(False)  # 固定大小
+
                 tk.Label(f_err, text="读取失败", fg="red", bg="#FFE4E1", font=("Arial", 9, "bold")).pack(pady=10)
-                tk.Label(f_err, text=img_id, bg="#FFE4E1", font=("Arial", 7), wraplength=140).pack()
+
+                # 显示文件名（提取后）
+                display_name = img_href.split('/')[-1] if '/' in img_href else img_href
+                tk.Label(f_err, text=display_name, bg="#FFE4E1", font=("Arial", 7), wraplength=140).pack()
+
                 tk.Label(f_err, text="清单中不存在或路径无效", bg="#FFE4E1", font=("Arial", 7), fg="#555").pack(side="bottom", pady=5)
 
     v_scrollbar.pack(side="right", fill="y")
