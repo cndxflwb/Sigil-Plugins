@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+<name>EPUB2TXT</name>
+<autostart>true</autostart>
+<autoclose>true</autoclose>
+<type>validation</type>
+<author>赤霓</author>
+<description>Converts XHTML files to plain Text</description>
+<engine>python3.4</engine>
+<version>0.0.2</version>
+<oslist>unx,win,osx</oslist>
+</plugin>
