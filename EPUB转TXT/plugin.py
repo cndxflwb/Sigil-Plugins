@@ -96,16 +96,16 @@ def removeAllTags(bk, epub_version):
             continue
 
         data = bk.readfile(id)
+        print('Processing: id=%s  href=%s' % (id, href))
         soup = BeautifulSoup(data, 'html.parser')
 
         if soup.body is None:
+            print('  -> soup.body is None, skipping.')
             continue
 
-        #optionally mark headings (h1-h6) using markdown syntax (#, ##, ...)
-        if prefs.get('mark_headings_as_markdown', False):
-            markHeadingsAsMarkdown(soup.body)
-
-        text_only = soup.body.get_text()
+        #extract text via safe recursive traversal (avoids sigil_bs4 next_element bug)
+        mark_headings = prefs.get('mark_headings_as_markdown', False)
+        text_only = safeGetText(soup.body, mark_headings)
         text_only = '\n' + text_only.strip() + '\n'
 
         #save all sections to an plain text output file
@@ -122,22 +122,80 @@ def removeAllTags(bk, epub_version):
     return(0)    
 
 
-def markHeadingsAsMarkdown(body):
-    """ Replace each <h1>..<h6> in body with a NavigableString that prepends
-        the corresponding number of '#' chars, so get_text() output contains
-        markdown-style heading marks. Surrounding newlines are added to keep
-        the heading on its own line.
+def safeGetText(node, mark_headings=False):
+    """ Safely extract text from a BeautifulSoup node using only node.children
+        (avoids sigil_bs4's broken descendants/next_element traversal).
+        When mark_headings is True, h1-h6 tags are prefixed with markdown '#'.
     """
-    for level in range(1, 7):
-        prefix = '#' * level + ' '
-        for tag in body.find_all('h' + str(level)):
-            text = (tag.get_text() or '').strip()
-            if not text:
-                tag.decompose()
-                continue
-            #collapse internal whitespace/newlines so heading stays single-line
-            text = re.sub(r'\s+', ' ', text)
-            tag.replace_with(NavigableString('\n' + prefix + text + '\n'))
+    HEADING_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+    parts = []
+
+    def _extract(n):
+        try:
+            children = list(n.children)
+        except AttributeError:
+            # NavigableString or leaf node
+            text = ''
+            try:
+                text = str(n)
+            except Exception:
+                pass
+            parts.append(text)
+            return
+
+        tag_name = getattr(n, 'name', None)
+        if tag_name is None:
+            # plain text node
+            try:
+                parts.append(str(n))
+            except Exception:
+                pass
+            return
+
+        tag_lower = tag_name.lower() if tag_name else ''
+
+        if mark_headings and tag_lower in HEADING_TAGS:
+            level = int(tag_lower[1])
+            prefix = '#' * level + ' '
+            # collect heading text safely
+            sub = []
+            for child in children:
+                sub_parts = []
+                def _collect(nn, out=sub_parts):
+                    try:
+                        cc = list(nn.children)
+                    except AttributeError:
+                        try:
+                            out.append(str(nn))
+                        except Exception:
+                            pass
+                        return
+                    nn_name = getattr(nn, 'name', None)
+                    if nn_name is None:
+                        try:
+                            out.append(str(nn))
+                        except Exception:
+                            pass
+                        return
+                    for c in cc:
+                        _collect(c, out)
+                _collect(child)
+                sub.extend(sub_parts)
+            heading_text = re.sub(r'\s+', ' ', ''.join(sub)).strip()
+            # fallback: if tag body is empty, try the title attribute
+            if not heading_text:
+                try:
+                    heading_text = (n.get('title') or '').strip()
+                except Exception:
+                    heading_text = ''
+            if heading_text:
+                parts.append('\n' + prefix + heading_text + '\n')
+        else:
+            for child in children:
+                _extract(child)
+
+    _extract(node)
+    return ''.join(parts)
 
 
 def getOpfTitle(bk):
